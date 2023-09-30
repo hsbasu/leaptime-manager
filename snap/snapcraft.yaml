@@ -1,0 +1,68 @@
+name: leaptime-manager
+summary: An all-in-one ergonomic app and data backup, and sync manager.
+description: |
+  Aiming to be an all-in-one, friendly to new-users, GUI based backup manager for Debian/Ubuntu based systems. The main purpose of this application is to help user backup and restore every component on a Debian/Ubuntu based system ergonomically, elegantly and separately.
+version: git
+contact: https://hsbasu.github.io/leaptime-manager
+
+grade: stable
+confinement: strict
+
+base: core22
+architectures:
+  - build-on: [amd64]
+    build-for: all
+
+slots:
+  leaptime-manager:
+    interface: dbus
+    bus: session
+    name: org.mamolinux.leaptime-manager
+
+apps:
+  leaptime-manager:
+    command: usr/bin/leaptime-manager
+    environment:
+      PYTHONPATH: $SNAP/lib/python3.10/site-packages:$SNAP/usr/lib/python3/dist-packages:$PYTHONPATH
+    desktop: usr/share/applications/leaptime-manager.desktop
+    extensions: [gnome]
+    plugs:
+      - desktop
+      - home
+    slots:
+      - leaptime-manager
+
+parts:
+  leaptime-manager:
+    source: https://github.com/mamolinux/leaptime-manager.git
+    source-branch: master
+    plugin: python
+    build-environment:
+      - PATH: $CRAFT_PART_INSTALL/bin:$PATH
+    build-packages:
+      - libglib2.0-bin  # to generate compiled gschema
+    stage-packages:
+      - gobject-introspection
+      - gir1.2-gtk-3.0
+      - python3
+      - python3-gi
+      - python3-apt
+      - python3-aptdaemon.gtk3widgets
+    
+    override-build: |
+      set -eu
+      craftctl default
+      # By default, pip will install everything
+      # under '/', e.g. into '/bin', '/share'
+      # Move everything to from '/' to '/usr'
+      mv $CRAFT_PART_INSTALL/bin/leaptime-manager* $CRAFT_PART_INSTALL/usr/bin
+      cp -a $CRAFT_PART_INSTALL/share/{applications,glib-2.0,icons} $CRAFT_PART_INSTALL/usr/share
+      rm -r $CRAFT_PART_INSTALL/share/{applications,glib-2.0,icons}
+    
+    override-prime: |
+      set -eu
+      craftctl default
+      # Fix-up application icon lookup
+      sed --in-place 's|^Icon=.*|Icon=\${SNAP}/usr/share/icons/hicolor/scalable/apps/leaptime-manager.svg|' usr/share/applications/leaptime-manager.desktop
+      # Recompile all gschemas
+      glib-compile-schemas ${CRAFT_PRIME}/usr/share/glib-2.0/schemas/
